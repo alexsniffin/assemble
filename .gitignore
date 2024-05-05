@@ -1,0 +1,22 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+
+# Poetry files
+poetry.lock
+.pypoetry-cache
+
+# Virtual environment
+.env
+.venv/
+
+# VSCode settings
+.vscode/
+
+# PyCharm settings
+.idea/
+*.iml
+
+# Operating system files
+.DS_Store
+Thumbs.db

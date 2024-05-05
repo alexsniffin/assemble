@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "assemble"
+version = "0.1.0"
+description = ""
+authors = ["Alexander Sniffin <alexsniffin@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.7.1"
+pykka = "^4.0.2"
+tenacity = "^8.2.3"
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.0.0"
+python-dotenv = "1.0.1"
+
+[tool.poetry.group.tools.dependencies]
+langchain-community = "^0.0.36"
+wikipedia = "^1.4.0"
+yfinance = "^0.2.38"
+fake_useragent = "1.5.1"
+
+[tool.poetry.group.llms.dependencies]
+openai = "^1.23.6"
+llama-cpp-python = "0.2.69"
+tiktoken = "^0.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
