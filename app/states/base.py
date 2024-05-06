@@ -1,41 +1,46 @@
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Optional, List, Dict, Any, Tuple
+from typing import Optional, List
+
 import tenacity
 
 from app.llm.generator import Generator
+from app.llm.types import Usage
 from app.memory.memory import Memory
 from app.memory.scratch_pad import ContextException
 from app.persona.persona import Persona
-from app.state.states import SystemStates
+from app.states.states import SystemStates
 from app.tools.adapter import ToolAdapter
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class GenerationHandlerResponse:
-    output: str
-    exclude_from_scratch_pad: bool
+class Transition:
     next_state: str
 
 
-class Node:
-    """ Represents a state in the agent's state machine, handling state-specific logic and transitions. """
+@dataclass
+class StateResult:
+    transition: Transition
+    prompt: str
+    response: str
+    token_usage: Usage
+
+
+class StateBase(ABC):
+    """ Abstract base class for all nodes in the state machine. """
+
+    name: str
 
     def __init__(self,
-                 state_name: str,
-                 prompt_handler: Callable[[Persona, Memory, Optional[List[ToolAdapter]]], str],
-                 generation_handler: Callable[[str, Memory, Optional[List[ToolAdapter]]], GenerationHandlerResponse],
                  generator: Generator,
                  tools: Optional[List[ToolAdapter]] = None,
                  retry_attempts: int = 5,
                  retry_multiplier: int = 2,
                  retry_min: int = 2,
                  retry_max: int = 30):
-        self.state_name = state_name
-        self.prompt_handler = prompt_handler
-        self.generation_handler = generation_handler
         self.generator = generator
         self.tools = tools
         self.retry = tenacity.retry(
@@ -50,29 +55,41 @@ class Node:
         )
         self._context_handler_limit = 50
 
-    def execute(self, persona: Persona, memory: Memory) -> Tuple[str, Dict[str, int], GenerationHandlerResponse]:
+    @abstractmethod
+    def build_prompt(self,
+                     persona: Persona,
+                     memory: Memory,
+                     tools: Optional[List[ToolAdapter]]) -> str:
+        pass
+
+    @abstractmethod
+    def handle_transition(self,
+                          response: str,
+                          memory: Memory,
+                          tools: Optional[List[ToolAdapter]]) -> Transition:
+        pass
+
+    def execute(self, persona: Persona, memory: Memory) -> StateResult:
         """ Execute the state logic, including generating responses and handling state transitions. """
 
         @self.retry
         def _execute_with_retry():
-            prompt = self.prompt_handler(persona, memory, self.tools)
+            prompt = None
             try:
                 for _ in range(self._context_handler_limit):
+                    prompt = self.build_prompt(persona, memory, self.tools)
                     if self.generator.is_context_limit(prompt):
                         memory.run_context_handlers()
-                        prompt = self.prompt_handler(persona, memory, self.tools)
                     else:
                         break
             except ContextException as e:
                 logger.error(f"Failed to generate LLM response: {e}")
-                return prompt, {}, GenerationHandlerResponse(
-                    output="Unable to generate anymore.",
-                    exclude_from_scratch_pad=True,
+                return prompt, {}, Transition(
                     next_state=SystemStates.EXIT.value
                 )
 
             response, token_usage = self.generator.generate(prompt)
-            state_handler_response = self.generation_handler(response, memory, self.tools)
-            return prompt, token_usage, state_handler_response
+            transition = self.handle_transition(response, memory, self.tools)
+            return StateResult(transition, prompt, response, token_usage)
 
         return _execute_with_retry()

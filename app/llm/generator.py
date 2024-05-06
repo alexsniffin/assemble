@@ -1,6 +1,7 @@
-from typing import Tuple, Dict, List
+from typing import Tuple
 
 from app.llm.adapter import LLMAdapter
+from app.llm.types import Usage
 
 
 class Generator:
@@ -9,8 +10,9 @@ class Generator:
         self.backend_kwargs = backend_kwargs
         self.token_limit_buffer = token_limit_buffer
 
-    def generate(self, prompt: str) -> Tuple[str, Dict[str, int]]:
-        return self.service.generate(prompt, **self.backend_kwargs)
+    def generate(self, prompt: str) -> Tuple[str, Usage]:
+        response, usage = self.service.generate(prompt, **self.backend_kwargs)
+        return response, Usage(**usage)
 
     def is_context_limit(self, prompt: str) -> bool:
         tokenized = self.service.tokenize(prompt)
