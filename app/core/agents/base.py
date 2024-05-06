@@ -6,12 +6,12 @@ import pykka
 from pydantic import BaseModel
 from pykka import ThreadingFuture
 
-from app.agents.messages import Query
-from app.llm.types import Usage
-from app.memory.memory import Memory, Message
-from app.persona.persona import Persona
-from app.states.base import StateBase
-from app.states.states import SystemStates
+from app.core.messages import Query
+from app.core.memory.memory import Memory, Message
+from app.core.persona import Persona
+from app.core.states.base import StateBase
+from app.core.states.states import SystemStates
+from app.core.types import Usage
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +23,10 @@ class Step(BaseModel):
     output: str
     token_usage: Usage
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class Response(BaseModel):
     final_output: str
     metadata: Dict[str, Any]
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class AgentBase(pykka.ThreadingActor):
@@ -113,24 +107,24 @@ class AgentBase(pykka.ThreadingActor):
             logger.info(f"Agent {self.__class__.__name__}:{self.actor_urn} executing state: {self.current_state}")
 
             result = state.execute(self.persona, self.memory)
-            self.memory.scratch_pad.set(f"{state.name}: {result.response}")
+            self.memory.scratch_pad.set(f"{state.name.upper()}: {result.response}")
 
-            next_state = result.transition.next_state
+            next_state = result.next_state
             if self.current_state == self.step_limit_state_name:
                 next_state = SystemStates.EXIT.value
 
             self.current_state = next_state
             if self.current_state != SystemStates.EXIT.value and not self.states[self.current_state]:
                 raise ValueError(
-                    f"Invalid state transition: {self.current_state} -> {result.transition.next_state}. Missing "
+                    f"Invalid state transition: {self.current_state} -> {result.next_state}. Missing "
                     f"state node for next state of {self.current_state}.")
 
             steps.append(
                 Step(
-                    state_name=state.name,
+                    state_name=f"{state.name}",
                     prompt=result.prompt,
                     output=result.response,
-                    next_state=self.current_state,
+                    next_state=f"{self.current_state}",
                     token_usage=result.token_usage
                 )
             )

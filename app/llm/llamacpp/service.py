@@ -6,7 +6,7 @@ try:
 except ImportError:
     raise ImportError("Please install LlamaCpp library: pip install llama-cpp-python")
 
-from app.llm.adapter import LLMAdapter
+from app.core.llm.adapter import LLMAdapter
 
 logger = logging.getLogger(__name__)
 

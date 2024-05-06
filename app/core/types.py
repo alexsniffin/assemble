@@ -1,8 +1,7 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 
-@dataclass
-class Usage:
+class Usage(BaseModel):
     total_tokens: int
     prompt_tokens: int
     completion_tokens: int

@@ -1,7 +1,7 @@
 from typing import Tuple
 
-from app.llm.adapter import LLMAdapter
-from app.llm.types import Usage
+from app.core.llm.adapter import LLMAdapter
+from app.core.types import Usage
 
 
 class Generator:

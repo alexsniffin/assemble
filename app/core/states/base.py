@@ -5,13 +5,13 @@ from typing import Optional, List
 
 import tenacity
 
-from app.llm.generator import Generator
-from app.llm.types import Usage
-from app.memory.memory import Memory
-from app.memory.scratch_pad import ContextException
-from app.persona.persona import Persona
-from app.states.states import SystemStates
-from app.tools.adapter import ToolAdapter
+from app.core.llm.generator import Generator
+from app.core.memory.memory import Memory
+from app.core.memory.scratch_pad import ContextException
+from app.core.persona import Persona
+from app.core.states.states import SystemStates
+from app.core.tools.adapter import ToolAdapter
+from app.core.types import Usage
 
 logger = logging.getLogger(__name__)
 
@@ -19,19 +19,18 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Transition:
     next_state: str
+    updated_response: Optional[str] = None
 
 
 @dataclass
 class StateResult:
-    transition: Transition
+    next_state: str
     prompt: str
     response: str
     token_usage: Usage
 
 
 class StateBase(ABC):
-    """ Abstract base class for all nodes in the state machine. """
-
     name: str
 
     def __init__(self,
@@ -55,6 +54,13 @@ class StateBase(ABC):
         )
         self._context_handler_limit = 50
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not hasattr(cls, 'name') or not isinstance(cls.name, str) or not cls.name.strip():
+            logger.error(f"Class {cls.__name__} is missing a static 'name' attribute, it is not a string, or it is "
+                         f"empty.")
+            raise ValueError(f"Class {cls.__name__} must have a non-empty static 'name' string attribute.")
+
     @abstractmethod
     def build_prompt(self,
                      persona: Persona,
@@ -70,8 +76,6 @@ class StateBase(ABC):
         pass
 
     def execute(self, persona: Persona, memory: Memory) -> StateResult:
-        """ Execute the state logic, including generating responses and handling state transitions. """
-
         @self.retry
         def _execute_with_retry():
             prompt = None
@@ -90,6 +94,8 @@ class StateBase(ABC):
 
             response, token_usage = self.generator.generate(prompt)
             transition = self.handle_transition(response, memory, self.tools)
-            return StateResult(transition, prompt, response, token_usage)
+            if transition.updated_response is not None:
+                response = transition.updated_response
+            return StateResult(transition.next_state, prompt, response, token_usage)
 
         return _execute_with_retry()

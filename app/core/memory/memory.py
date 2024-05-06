@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, List
 
-from app.memory.scratch_pad import ContextStrategy, ScratchPad
+from app.core.memory.scratch_pad import ContextStrategy, ScratchPad
 
 logger = logging.getLogger(__name__)
 

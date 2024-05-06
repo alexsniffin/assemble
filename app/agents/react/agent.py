@@ -2,17 +2,18 @@ import enum
 import logging
 from typing import Optional, List
 
+from pydantic import BaseModel, Field
 from pykka import ActorRef
 
-from app.agents.base import AgentBase
-from app.llm.adapter import LLMAdapter
-from app.llm.generator import Generator
-from app.memory.memory import Memory
-from app.persona.persona import Persona
-from app.states.base import StateBase, Transition
-from app.states.defaults import DefaultTextHandlerBase, DefaultToolsHandlerBase
+from app.core.agents.base import AgentBase
+from app.core.llm.adapter import LLMAdapter
+from app.core.llm.generator import Generator
+from app.core.memory.memory import Memory
+from app.core.persona import Persona
+from app.core.states.base import StateBase, Transition
+from app.states.defaults import text_handler, tools_handler
 from app.states.final_answer.state import FinalAnswerState
-from app.tools.adapter import ToolAdapter
+from app.core.tools.adapter import ToolAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +31,13 @@ class ReActAgent(AgentBase):
     pass
 
 
-class ObserveState(DefaultTextHandlerBase, StateBase):
+class ObserveState(StateBase):
     name: str = States.OBSERVE
-
-    def __init__(self, generator: Generator, tools: Optional[List[ToolAdapter]] = None):
-        StateBase.__init__(self, generator, tools)
-        DefaultTextHandlerBase.__init__(self, next_state=States.THOUGHT.value, exclude_from_scratch_pad=False)
 
     def build_prompt(self, persona: Persona, memory: Memory, tools: Optional[List[ToolAdapter]]) -> str:
         prompt = f'''{persona.prompt()}
 
-Given the thought and the action from that thought, using what you know about the problem, reflect on what you observe.
+Given a thought and the action from that thought, reflect on what you observe.
 
 The thought:
 """
@@ -52,18 +49,16 @@ The action from the thought:
 {memory.data.get("last_action")}
 """
 
-Provide a concise observation of what you observe:'''
+Provide a summary of what you observe:'''
         logger.debug(f"Using prompt for action step: {prompt}")
         return prompt
 
+    def handle_transition(self, response: str, memory: Memory, _: Optional[List[ToolAdapter]]) -> Transition:
+        return text_handler(response=response, memory=memory, next_state=States.THOUGHT)
 
-class ActionState(DefaultToolsHandlerBase, StateBase):
+
+class ActionState(StateBase):
     name: str = States.ACTION
-
-    def __init__(self, generator: Generator, tools: Optional[List[ToolAdapter]] = None):
-        StateBase.__init__(self, generator, tools)
-        DefaultToolsHandlerBase.__init__(self, next_state=States.OBSERVE.value, exclude_from_scratch_pad=False,
-                                         save_data_key="last_action")
 
     def build_prompt(self, persona: Persona, memory: Memory, tools: Optional[List[ToolAdapter]]) -> str:
         tool_schemas = [tool.schema() for tool in tools]
@@ -95,8 +90,25 @@ Respond with the JSON input for the tool of your choice to best solve the proble
         return prompt
 
     def handle_transition(self, response: str, memory: Memory, tools: Optional[List[ToolAdapter]]) -> Transition:
-        memory.data.set("last_action", response)
-        return Transition(next_state=States.OBSERVE.value)
+        return tools_handler(response=response, memory=memory, tools=tools, next_state=States.OBSERVE,
+                             save_data_key="last_action")
+
+
+class ThoughtStateType(str, enum.Enum):
+    """
+    The type of reason for your response.
+    """
+    ACTION = 'Action'
+    ANSWER = 'Answer'
+
+
+class ThoughtStateChoice(BaseModel):
+    """
+    The thought of which choice to make next.
+    """
+    type: ThoughtStateType = Field(..., description="The reason type of choice for your response. Pick Action if you "
+                                                    "need to perform work, or Answer if you have a final answer.")
+    reason: str = Field(..., description="The reason details for the choice.")
 
 
 class ThoughtState(StateBase):
@@ -104,22 +116,19 @@ class ThoughtState(StateBase):
 
     @staticmethod
     def _get_thought_component_prompt(last_thought_exists: bool) -> str:
-        """Generate thought component prompt based on the existence of the last thought."""
         if last_thought_exists:
             return "Create a thought for how to answer the message based on the previous steps you have taken."
         return "Create a thought based on the message."
 
     @staticmethod
     def _get_notes_component_prompt(notes: List[str]) -> str:
-        """Generate notes component prompt if there are any notes."""
         if notes:
             return "\nHere are your notes so far in order from oldest to newest, use these to help create your next " \
-                   "thought:\n" + "\n".join(notes) + "\n"
+                   "though. If you know the answer from your notes, say so:\n" + "\n".join(notes) + "\n"
         return ""
 
     @staticmethod
     def _get_messages_component_formatted(messages: List) -> str:
-        """Format messages component if there are any messages."""
         if messages:
             return "Previous Messages, use these as context to the current message:\n\"\"\"\n" + "".join(
                 messages) + "\n\"\"\""
@@ -127,7 +136,6 @@ class ThoughtState(StateBase):
 
     @staticmethod
     def _get_tools_component_formatted(tools: List[ToolAdapter]) -> str:
-        """Generate formatted string for tools information."""
         return "\n".join([f"name: {tool.name}\ndescription: {tool.description}\n\n" for tool in tools])
 
     def build_prompt(self, persona: Persona, memory: Memory, tools: List[ToolAdapter]) -> str:
@@ -144,8 +152,6 @@ class ThoughtState(StateBase):
         prompt = f'''{persona.prompt()}
 
 {thought_component_prompt}
-
-Your thought will be used to help you answer the message.
 
 Thought instructions:
 - Provides exact details on the task to best answer the message, do not forget important details.
@@ -168,25 +174,33 @@ Here are the tools you have access to, you DO NOT have access to other tools, us
 {tools_component_formatted}
 """
 
-ALWAYS respond with only one of the following:
-- "Answer: " if you know the answer to the message. Provide the full answer with all of the details on how you solved any problems.
-- "Thought: " followed by your thought.
+Provide a choice based on the following JSON schema:
+"""
+{ThoughtStateChoice.schema()}
+"""
 
-Provide your thought OR answer but only one.'''
+Your response should be in JSON matching the schema. It should include your reasoning for the choice. 
+- If you don't know the answer, your provide details for the action to take. 
+- If you know the answer, it should give the answer and any important details on how you know.
+
+Choice JSON:'''
         logger.debug(f"Using prompt for thought step: {prompt}")
         return prompt
 
     def handle_transition(self, response: str, memory: Memory, tools: List[ToolAdapter]) -> Transition:
-        if "Answer:" in response:
-            return Transition(next_state=States.FINAL_ANSWER.value)
-        else:
-            memory.data.set("last_thought", response)
-            return Transition(next_state=States.ACTION.value)
+        try:
+            choice = ThoughtStateChoice.model_validate_json(response)
+            if choice.type == ThoughtStateType.ACTION:
+                memory.data.set("last_thought", choice.reason)
+                return Transition(next_state=States.ACTION, updated_response=choice.reason)
+            elif choice.type == ThoughtStateType.ANSWER:
+                return Transition(next_state=States.FINAL_ANSWER, updated_response=choice.reason)
+        except Exception as e:
+            return Transition(updated_response=f"Failed to parse response as Choice: {e}",
+                              next_state=States.THOUGHT)
 
 
 class ReActAgentFactory:
-    def __init__(self):
-        pass
 
     @staticmethod
     def start(llm: LLMAdapter,
@@ -205,7 +219,7 @@ class ReActAgentFactory:
             memory = Memory()
 
         thought_state = ThoughtState(
-            generator=Generator(service=llm, use_json_model=False, temperature=0.1),
+            generator=Generator(service=llm, use_json_model=True, temperature=0.1),
             tools=tools
         )
         action_state = ActionState(

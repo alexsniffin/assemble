@@ -21,7 +21,7 @@ except ImportError as e:
         "Some required modules are missing. "
         "Please install them with 'pip install fake-useragent'.") from e
 
-from app.tools.adapter import ToolAdapter, ToolSchema, ToolBase
+from app.core.tools.adapter import ToolAdapter, ToolSchema, ToolBase
 
 
 class YahooFinanceNewsInput(ToolBase):

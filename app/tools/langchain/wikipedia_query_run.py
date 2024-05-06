@@ -15,7 +15,7 @@ except ImportError as e:
         "Some required modules are missing. "
         "Please install it with 'pip install wikipedia'.") from e
 
-from app.tools.adapter import ToolAdapter, ToolSchema, ToolBase
+from app.core.tools.adapter import ToolAdapter, ToolSchema, ToolBase
 
 
 class WikipediaQueryInput(ToolBase):
