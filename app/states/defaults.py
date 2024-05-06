@@ -36,10 +36,11 @@ def tools_handler(
     tool_input = tool.validate(response)
     output = tool.run(tool_input)
 
-    if tool.exclude_from_scratch_pad:
-        tool_results = f'Tool executed for {tool.name}.'
-    else:
-        tool_results = f'Tool results for {tool.name}: """\nInput: {response}\nOutput: {output.model_dump_json()}"""'
+    tool_results = f'Tool executed for {tool.name}.'
+    if not tool.exclude_input_from_scratch_pad:
+        tool_results = tool_results + f'\nInput: {response}'
+    elif not tool.exclude_output_from_scratch_pad:
+        tool_results = tool_results + f'\nOutput: {output.model_dump_json()}'
     if save_data_key is not None:
         memory.data.set(save_data_key, tool_results)
     return Transition(

@@ -115,9 +115,10 @@ class ThoughtState(StateBase):
     name: str = States.THOUGHT
 
     @staticmethod
-    def _get_thought_component_prompt(last_thought_exists: bool) -> str:
-        if last_thought_exists:
-            return "Create a thought for how to answer the message based on the previous steps you have taken."
+    def _get_thought_component_prompt(last_thought: str) -> str:
+        if len(last_thought) > 0:
+            return f"Create a thought based on the previous steps you have taken. Use your observations in your notes " \
+                   f"to help. Don't give the same thought as last time: {last_thought}\n"
         return "Create a thought based on the message."
 
     @staticmethod
@@ -140,12 +141,12 @@ class ThoughtState(StateBase):
         return "\n".join([f"name: {tool.name}\ndescription: {tool.description}\n\n" for tool in tools])
 
     def build_prompt(self, persona: Persona, memory: Memory, tools: List[ToolAdapter]) -> str:
-        last_thought_exists = memory.data.exists("last_thought")
+        last_thought = memory.data.get("last_thought") if memory.data.exists("last_thought") else ""
         notes = memory.scratch_pad.get()
         messages = [f"{message.name}: {message.content}\n" for message in memory.data.get_all_messages()]
         current_message_content = memory.data.get_current_message().content
 
-        thought_component_prompt = self._get_thought_component_prompt(last_thought_exists)
+        thought_component_prompt = self._get_thought_component_prompt(last_thought)
         notes_component_prompt = self._get_notes_component_prompt(notes)
         messages_component_formatted = self._get_messages_component_formatted(messages)
         tools_component_formatted = self._get_tools_component_formatted(tools)
@@ -182,7 +183,7 @@ Provide a choice based on the following JSON schema:
 
 Your response should be in JSON matching the schema. It should include your reasoning for the choice. 
 - If you don't know the answer, provide a short summary of the details for the action to take.
-- If you know the answer, it should give the answer and any important details on how you know.
+- If you know the answer, use your observations to help. The answer should include any important details on how you know.
 
 Choice JSON:'''
         logger.debug(f"Using prompt for thought step: {prompt}")

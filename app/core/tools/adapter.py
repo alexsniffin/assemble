@@ -48,6 +48,12 @@ class ToolAdapter(ABC, Generic[InputType, OutputType]):
 
     @property
     @abstractmethod
-    def exclude_from_scratch_pad(self) -> bool:
+    def exclude_output_from_scratch_pad(self) -> bool:
+        """ Return whether the tool should be excluded from the scratch pad. """
+        pass
+
+    @property
+    @abstractmethod
+    def exclude_input_from_scratch_pad(self) -> bool:
         """ Return whether the tool should be excluded from the scratch pad. """
         pass
