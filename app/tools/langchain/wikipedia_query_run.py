@@ -39,7 +39,11 @@ class LangchainWikipediaQueryRun(ToolAdapter):
         "A tool for querying the Wikipedia API."
     )
 
-    def __init__(self, top_k_results: int = 3, doc_content_chars_max: int = 1024, verbose: bool = False):
+    def __init__(self,
+                 top_k_results: int = 3,
+                 doc_content_chars_max: int = 1024,
+                 verbose: bool = False,
+                 exclude_from_scratch_pad: bool = False):
         self.verbose = verbose
         api_wrapper = WikipediaAPIWrapper(
             top_k_results=top_k_results,
@@ -47,6 +51,7 @@ class LangchainWikipediaQueryRun(ToolAdapter):
             load_all_available_meta=True
         )
         self.tool = WikipediaQueryRun(api_wrapper=api_wrapper)
+        self.exclude_from_scratch_pad = exclude_from_scratch_pad
 
     def run(self, inputs: WikipediaQueryInput) -> WikipediaQueryOutput:
         output = self.tool.run(inputs.query, return_direct=True, verbose=self.verbose)
@@ -61,3 +66,6 @@ class LangchainWikipediaQueryRun(ToolAdapter):
             tool_description=self.description,
             tool_parameters=WikipediaQueryInput.model_json_schema()
         ).model_dump()
+
+    def exclude_from_scratch_pad(self) -> bool:
+        return self.exclude_from_scratch_pad

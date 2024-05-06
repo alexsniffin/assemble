@@ -22,9 +22,11 @@ class OpenAIService(LLMAdapter):
             self,
             api_key: str,
             model: str = "gpt-3.5-turbo-0125",
+            encoding_type: str = "cl100k_base",
             context_window_length: int = 4094):
         self.openai = OpenAI(api_key=api_key)
         self.model = model
+        self.encoding_type = encoding_type
         self._model_context_windows = {
             "gpt-4-turbo": 128000,
             "gpt-4-turbo-2024-04-09": 128000,
@@ -72,7 +74,7 @@ class OpenAIService(LLMAdapter):
             raise e
 
     def tokenize(self, text: str) -> List[int]:
-        enc = tiktoken.get_encoding(self.model)
+        enc = tiktoken.get_encoding(self.encoding_type)
         return enc.encode(text)
 
     def context_length(self) -> int:

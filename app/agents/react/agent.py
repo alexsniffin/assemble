@@ -124,7 +124,8 @@ class ThoughtState(StateBase):
     def _get_notes_component_prompt(notes: List[str]) -> str:
         if notes:
             return "\nHere are your notes so far in order from oldest to newest, use these to help create your next " \
-                   "though. If you know the answer from your notes, say so:\n" + "\n".join(notes) + "\n"
+                   "though. If you know the answer from your notes, say so. Don't repeat yourself from previous " \
+                   "notes.\n\nNotes:\n" + "\n".join(notes) + "\n"
         return ""
 
     @staticmethod
@@ -180,7 +181,7 @@ Provide a choice based on the following JSON schema:
 """
 
 Your response should be in JSON matching the schema. It should include your reasoning for the choice. 
-- If you don't know the answer, your provide details for the action to take. 
+- If you don't know the answer, provide a short summary of the details for the action to take.
 - If you know the answer, it should give the answer and any important details on how you know.
 
 Choice JSON:'''

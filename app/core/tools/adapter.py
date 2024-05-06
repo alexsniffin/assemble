@@ -45,3 +45,9 @@ class ToolAdapter(ABC, Generic[InputType, OutputType]):
     def description(self) -> str:
         """ Return a description of what the tool does. """
         pass
+
+    @property
+    @abstractmethod
+    def exclude_from_scratch_pad(self) -> bool:
+        """ Return whether the tool should be excluded from the scratch pad. """
+        pass
