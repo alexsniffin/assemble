@@ -1,8 +1,9 @@
+import json
 from typing import Optional, List
 
 from app.core.memory.memory import Memory
 from app.core.states.base import Transition
-from app.core.tools.adapter import ToolAdapter, ToolBase
+from app.core.tools.adapter import ToolAdapter
 
 
 def text_handler(response: str,
@@ -25,16 +26,18 @@ def tools_handler(
     if tools is None:
         raise ValueError("Tools must be provided for this state handler.")
 
-    parsed_tool_input = ToolBase.model_validate_json(response)
-    tool = next((tool for tool in tools if tool.name == parsed_tool_input.tool_name), None)
+    parsed_tool_input = json.loads(response)
+    tool = next((tool for tool in tools if tool.name == parsed_tool_input['tool_name']), None)
     if tool is None:
         return Transition(
             updated_response="Invalid tool name for response. Please try again.",
             next_state=next_state,
         )
 
-    tool_input = tool.validate(response)
-    output = tool.run(tool_input)
+    del parsed_tool_input['tool_name']
+
+    typed_input = tool.validate(parsed_tool_input)
+    output = tool.run(typed_input)
 
     tool_results = f'Tool executed for {tool.name}.'
     if not tool.exclude_input_from_scratch_pad:

@@ -37,7 +37,7 @@ class ObserveState(StateBase):
     def build_prompt(self, persona: Persona, memory: Memory, tools: Optional[List[ToolAdapter]]) -> str:
         prompt = f'''{persona.prompt()}
 
-Given a thought and the action from that thought, reflect on what you observe.
+Given a thought and the action for it, reflect on what you observe.
 
 The thought:
 """
@@ -49,7 +49,7 @@ The action from the thought:
 {memory.data.get("last_action")}
 """
 
-Provide a summary of what you observe:'''
+Provide a summary of what you observe with important details from the actions output:'''
         logger.debug(f"Using prompt for action step: {prompt}")
         return prompt
 
@@ -115,18 +115,18 @@ class ThoughtState(StateBase):
     name: str = States.THOUGHT
 
     @staticmethod
-    def _get_thought_component_prompt(last_thought: str) -> str:
-        if len(last_thought) > 0:
+    def _get_thought_component_prompt(last_thought_exist: bool) -> str:
+        if last_thought_exist:
             return f"Create a thought based on the previous steps you have taken. Use your observations in your notes " \
-                   f"to help. Don't give the same thought as last time: {last_thought}\n"
+                   f"to help."
         return "Create a thought based on the message."
 
     @staticmethod
     def _get_notes_component_prompt(notes: List[str]) -> str:
         if notes:
-            return "\nHere are your notes so far in order from oldest to newest, use these to help create your next " \
-                   "though. If you know the answer from your notes, say so. Don't repeat yourself from previous " \
-                   "notes.\n\nNotes:\n" + "\n".join(notes) + "\n"
+            return "Here are your notes so far in order from oldest to newest, use these to help create your next " \
+                   "thought. If you know the answer from your notes, say so.\n\nNotes:\n" + "\n".join(notes) + "" \
+                   "Review your thoughts, actions and observations and don't repeat yourself from previous notes."
         return ""
 
     @staticmethod
@@ -141,12 +141,12 @@ class ThoughtState(StateBase):
         return "\n".join([f"name: {tool.name}\ndescription: {tool.description}\n\n" for tool in tools])
 
     def build_prompt(self, persona: Persona, memory: Memory, tools: List[ToolAdapter]) -> str:
-        last_thought = memory.data.get("last_thought") if memory.data.exists("last_thought") else ""
+        last_thought_exist = memory.data.exists("last_thought")
         notes = memory.scratch_pad.get()
         messages = [f"{message.name}: {message.content}\n" for message in memory.data.get_all_messages()]
         current_message_content = memory.data.get_current_message().content
 
-        thought_component_prompt = self._get_thought_component_prompt(last_thought)
+        thought_component_prompt = self._get_thought_component_prompt(last_thought_exist)
         notes_component_prompt = self._get_notes_component_prompt(notes)
         messages_component_formatted = self._get_messages_component_formatted(messages)
         tools_component_formatted = self._get_tools_component_formatted(tools)
@@ -163,13 +163,16 @@ Thought instructions:
 -- If the problem cannot be solved or if you are unsure, give your answer with why.
 - If you keep running into issues with your tools, give your answer with the problems you're running into.
 - If the message doesn't require any tool, just give your answer.
+- Don't repeat yourself from previous thoughts.
 
-Message:
+{messages_component_formatted}
+
+Current message:
 """
 {current_message_content}
 """
+
 {notes_component_prompt}
-{messages_component_formatted}
 
 Here are the tools you have access to, you DO NOT have access to other tools, use the name of the tool you think can help:
 """
@@ -182,7 +185,7 @@ Provide a choice based on the following JSON schema:
 """
 
 Your response should be in JSON matching the schema. It should include your reasoning for the choice. 
-- If you don't know the answer, provide a short summary of the details for the action to take.
+- If you don't know the answer, provide a short summary with unique details for the action to take.
 - If you know the answer, use your observations to help. The answer should include any important details on how you know.
 
 Choice JSON:'''
@@ -213,10 +216,10 @@ class ReActAgentFactory:
               clear_data_after_answer: bool = False,
               step_limit: int = 10) -> ActorRef[ReActAgent]:
         if persona is None:
-            persona = Persona(description="You're a helpful assistant. You solve problems by breaking them down into "
-                                          "multiple steps, thinking on those steps, acting on them, and observing. "
-                                          "Given the problem, you will use your tools to solve it in as few steps as "
-                                          "possible.")
+            persona = Persona(
+                description=f"You're a helpful assistant called {ReActAgent.name}. You solve problems by breaking "
+                            f"them down into multiple steps, thinking on those steps, acting on them, and observing. "
+                            f"Given the problem, you will use your tools to solve it in as few steps as possible.")
         if memory is None:
             memory = Memory()
 

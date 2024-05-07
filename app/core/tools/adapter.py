@@ -1,28 +1,27 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Dict, TypedDict, Any
+from typing import TypeVar, Generic, Dict, Any
 
-from pydantic import BaseModel, Field
-
-
-class ToolSchema(BaseModel):
-    tool_name: str = Field(..., description="The name of the tool.")
-    tool_description: str = Field(..., description="The description of the tool.")
-    tool_parameters: Dict[str, Any] = Field(..., description="The parameters of the tool.")
+from pydantic import BaseModel
 
 
-class ToolBase(BaseModel):
-    tool_name: str = Field(..., description="The name of the tool you choose to use.")
+class ToolInput(BaseModel):
+    name: str
+    parameters: Dict[str, Any]
 
 
-InputType = TypeVar("InputType", bound=ToolBase)
-OutputType = TypeVar("OutputType", bound=ToolBase)
+class ToolDetails(BaseModel):
+    name: str
+    description: str
+
+
+InputType = TypeVar("InputType", bound=BaseModel)
+OutputType = TypeVar("OutputType", bound=BaseModel)
 
 
 class ToolAdapter(ABC, Generic[InputType, OutputType]):
-    """ Abstract base class for tool adapters, defining a standard interface for tools. """
 
     @abstractmethod
-    def run(self, inputs: InputType) -> OutputType:
+    def run(self, input: InputType) -> OutputType:
         pass
 
     @abstractmethod
@@ -30,7 +29,7 @@ class ToolAdapter(ABC, Generic[InputType, OutputType]):
         pass
 
     @abstractmethod
-    def schema(self) -> ToolSchema:
+    def schema(self) -> Dict[str, Any]:
         """ Return the schema for input/output validation. """
         pass
 
