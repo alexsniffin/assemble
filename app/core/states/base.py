@@ -23,11 +23,11 @@ class Transition:
 
 
 @dataclass
-class StateResult:
+class StateResponse:
     next_state: str
-    prompt: str
-    response: str
-    token_usage: Usage
+    prompt: Optional[str] = None
+    response: Optional[str] = None
+    token_usage: Optional[Usage] = None
 
 
 class StateBase(ABC):
@@ -68,16 +68,25 @@ class StateBase(ABC):
                      tools: Optional[List[ToolAdapter]]) -> str:
         pass
 
-    @abstractmethod
-    def handle_transition(self,
-                          response: str,
+    def before_generation(self,
                           memory: Memory,
-                          tools: Optional[List[ToolAdapter]]) -> Transition:
+                          tools: Optional[List[ToolAdapter]]) -> Optional[Transition]:
+        return None
+
+    @abstractmethod
+    def after_generation(self,
+                         generation: str,
+                         memory: Memory,
+                         tools: Optional[List[ToolAdapter]]) -> Transition:
         pass
 
-    def execute(self, persona: Persona, memory: Memory) -> StateResult:
+    def execute(self, persona: Persona, memory: Memory) -> StateResponse:
         @self.retry
         def _execute_with_retry():
+            transition = self.before_generation(memory, self.tools)
+            if transition is not None:
+                return StateResponse(transition.next_state)
+
             prompt = None
             try:
                 for _ in range(self._context_handler_limit):
@@ -93,9 +102,11 @@ class StateBase(ABC):
                 )
 
             response, token_usage = self.generator.generate(prompt)
-            transition = self.handle_transition(response, memory, self.tools)
+
+            transition = self.after_generation(response, memory, self.tools)
             if transition.updated_response is not None:
                 response = transition.updated_response
-            return StateResult(transition.next_state, prompt, response, token_usage)
+
+            return StateResponse(transition.next_state, prompt, response, token_usage)
 
         return _execute_with_retry()

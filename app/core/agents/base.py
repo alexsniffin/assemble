@@ -1,6 +1,6 @@
 import logging
 import threading
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 import pykka
 from pydantic import BaseModel
@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 class Step(BaseModel):
     state_name: str
     next_state: str
-    prompt: str
-    output: str
-    token_usage: Usage
+    prompt: Optional[str] = None
+    output: Optional[str] = None
+    token_usage: Optional[Usage] = None
 
 
 class Response(BaseModel):
@@ -106,26 +106,26 @@ class AgentBase(pykka.ThreadingActor):
             state = self.states[self.current_state]
             logger.info(f"Agent {self.__class__.__name__}:{self.actor_urn} executing state: {self.current_state}")
 
-            result = state.execute(self.persona, self.memory)
-            self.memory.scratch_pad.set(f"{state.name.upper()}: {result.response}")
+            response = state.execute(self.persona, self.memory)
+            self.memory.scratch_pad.set(f"{state.name.upper()}: {response.response}")
 
-            next_state = result.next_state
+            next_state = response.next_state
             if self.current_state == self.step_limit_state_name:
                 next_state = SystemStates.EXIT.value
 
             self.current_state = next_state
             if self.current_state != SystemStates.EXIT.value and not self.states[self.current_state]:
                 raise ValueError(
-                    f"Invalid state transition: {self.current_state} -> {result.next_state}. Missing "
+                    f"Invalid state transition: {self.current_state} -> {response.next_state}. Missing "
                     f"state node for next state of {self.current_state}.")
 
             steps.append(
                 Step(
                     state_name=f"{state.name}",
-                    prompt=result.prompt,
-                    output=result.response,
+                    prompt=response.prompt,
+                    output=response.response,
                     next_state=f"{self.current_state}",
-                    token_usage=result.token_usage
+                    token_usage=response.token_usage
                 )
             )
             step_count += 1

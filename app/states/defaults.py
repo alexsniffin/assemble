@@ -1,6 +1,9 @@
 import json
 from typing import Optional, List
 
+from pydantic import BaseModel
+from pydantic.v1 import BaseModel as BaseModelV1
+
 from app.core.memory.memory import Memory
 from app.core.states.base import Transition
 from app.core.tools.adapter import ToolAdapter
@@ -42,8 +45,15 @@ def tools_handler(
     tool_results = f'Tool executed for {tool.name}.'
     if not tool.exclude_input_from_scratch_pad:
         tool_results = tool_results + f'\nInput: {response}'
-    elif not tool.exclude_output_from_scratch_pad:
-        tool_results = tool_results + f'\nOutput: {output.model_dump_json()}'
+    if not tool.exclude_output_from_scratch_pad:
+        if isinstance(output, str):
+            tool_results = tool_results + f'\nOutput: {output}'
+        elif isinstance(output, BaseModel):
+            tool_results = tool_results + f'\nOutput: {output.model_dump_json()}'
+        elif isinstance(output, BaseModelV1):
+            tool_results = tool_results + f'\nOutput: {output.json()}'
+        else:
+            tool_results = tool_results + f'\nOutput: {str(output)}'
     if save_data_key is not None:
         memory.data.set(save_data_key, tool_results)
     return Transition(

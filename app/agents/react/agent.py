@@ -53,7 +53,7 @@ Provide a summary of what you observe with important details from the actions ou
         logger.debug(f"Using prompt for action step: {prompt}")
         return prompt
 
-    def handle_transition(self, response: str, memory: Memory, _: Optional[List[ToolAdapter]]) -> Transition:
+    def after_generation(self, response: str, memory: Memory, _: Optional[List[ToolAdapter]]) -> Transition:
         return text_handler(response=response, memory=memory, next_state=States.THOUGHT)
 
 
@@ -89,7 +89,7 @@ Respond with the JSON input for the tool of your choice to best solve the proble
         logger.debug(f"Using prompt for action step: {prompt}")
         return prompt
 
-    def handle_transition(self, response: str, memory: Memory, tools: Optional[List[ToolAdapter]]) -> Transition:
+    def after_generation(self, response: str, memory: Memory, tools: Optional[List[ToolAdapter]]) -> Transition:
         return tools_handler(response=response, memory=memory, tools=tools, next_state=States.OBSERVE,
                              save_data_key="last_action")
 
@@ -192,7 +192,7 @@ Choice JSON:'''
         logger.debug(f"Using prompt for thought step: {prompt}")
         return prompt
 
-    def handle_transition(self, response: str, memory: Memory, tools: List[ToolAdapter]) -> Transition:
+    def after_generation(self, response: str, memory: Memory, tools: List[ToolAdapter]) -> Transition:
         try:
             choice = ThoughtStateChoice.model_validate_json(response)
             if choice.type == ThoughtStateType.ACTION:
