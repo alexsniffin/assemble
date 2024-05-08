@@ -76,6 +76,7 @@ class LangChainToolAdapter(ToolAdapter, Generic[InputType, OutputType]):
 
     def schema(self) -> Dict[str, Any]:
         input_schema = self.tool.get_input_schema().schema()
+        input_schema['title'] = self.name
         return build_schema(self.name, self.description, input_schema)
 
     def exclude_input_from_scratch_pad(self) -> bool:

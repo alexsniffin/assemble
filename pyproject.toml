@@ -17,8 +17,6 @@ python-dotenv = "1.0.1"
 
 [tool.poetry.group.tools.dependencies]
 langchain-community = "^0.0.36"
-wikipedia = "^1.4.0"
-yfinance = "^0.2.38"
 fake_useragent = "1.5.1"
 
 [tool.poetry.group.llms.dependencies]

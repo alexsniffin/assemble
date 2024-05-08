@@ -10,8 +10,8 @@ class ToolInput(BaseModel):
 
 
 class ToolDetails(BaseModel):
-    name: str
-    description: str
+    tool_name: str
+    tool_description: str
 
 
 InputType = TypeVar("InputType", bound=BaseModel)

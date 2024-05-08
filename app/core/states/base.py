@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class Transition:
     next_state: str
     updated_response: Optional[str] = None
+    token_usage: Optional[Usage] = None
 
 
 @dataclass
@@ -106,6 +107,11 @@ class StateBase(ABC):
             transition = self.after_generation(response, memory, self.tools)
             if transition.updated_response is not None:
                 response = transition.updated_response
+
+            if transition.token_usage is not None:
+                token_usage.total_tokens += transition.token_usage.total_tokens
+                token_usage.completion_tokens += transition.token_usage.completion_tokens
+                token_usage.prompt_tokens += transition.token_usage.prompt_tokens
 
             return StateResponse(transition.next_state, prompt, response, token_usage)
 

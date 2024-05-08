@@ -29,7 +29,7 @@ Notes from oldest to newest:
 {memory.scratch_pad.prompt()}
 """
 
-Your answer to the problem.'''
+Your complete and detailed answer to the problem.'''
 
     def after_generation(self, response: str, memory: Memory, tools: Optional[List[ToolAdapter]]) -> Transition:
         return text_handler(response=response, memory=memory, next_state=SystemStates.EXIT.value)

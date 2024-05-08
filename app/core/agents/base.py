@@ -107,6 +107,10 @@ class AgentBase(pykka.ThreadingActor):
             logger.info(f"Agent {self.__class__.__name__}:{self.actor_urn} executing state: {self.current_state}")
 
             response = state.execute(self.persona, self.memory)
+            if response is None:
+                raise ValueError(
+                    f"Invalid state transition from: {self.current_state}.")
+
             self.memory.scratch_pad.set(f"{state.name.upper()}: {response.response}")
 
             next_state = response.next_state
