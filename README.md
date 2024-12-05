@@ -12,3 +12,7 @@
 ## Getting Started
 
 Explore the [examples](examples) to see how to use assemble.
+
+## Support
+
+This project isn't supported but more so a proof of concept on a design for how agents can be created.
